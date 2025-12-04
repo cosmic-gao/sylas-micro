@@ -1,0 +1,63 @@
+.home {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.hero-section {
+  text-align: center;
+  padding: 48px 24px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  margin-bottom: 32px;
+}
+
+.hero-section h2 {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.hero-section p {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.info-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.info-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 28px 24px;
+  position: relative;
+  transition: transform 0.2s ease;
+}
+
+.info-card:hover {
+  transform: translateY(-4px);
+}
+
+.card-number {
+  font-size: 48px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.1);
+  position: absolute;
+  top: 12px;
+  right: 16px;
+}
+
+.info-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.info-card p {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.6;
+}
+

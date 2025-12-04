@@ -1,0 +1,13 @@
+{
+  "name": "sylas-micro",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm run dev:main & pnpm run dev:sub1 & pnpm run dev:sub2",
+    "dev:main": "pnpm --filter @sylas/main serve",
+    "dev:sub1": "pnpm --filter @sylas/sub-app1 dev",
+    "dev:sub2": "pnpm --filter @sylas/sub-app2 dev",
+    "build": "pnpm -r run build"
+  }
+}
+

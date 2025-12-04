@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>独立使用 AppDashboard Web Component</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f0f23;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      min-height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 使用 Web Component -->
+    <app-dashboard id="dashboard"></app-dashboard>
+  </div>
+
+  <!-- 加载 Wujie (如果使用 CDN) -->
+  <script src="https://unpkg.com/wujie@1.0.22/dist/index.umd.js"></script>
+  
+  <!-- 加载 AppDashboard Web Component -->
+  <script type="module">
+    // 方式1: 如果使用打包工具，直接导入
+    // import AppDashboard from './src/components/AppDashboard.js'
+    
+    // 方式2: 如果使用 CDN 或独立文件
+    // 假设 AppDashboard 已经通过 script 标签加载并注册
+    
+    // 配置应用列表（可选）
+    const dashboard = document.getElementById('dashboard')
+    
+    // 可以通过属性配置应用列表
+    const apps = [
+      {
+        id: 'sub-app1',
+        name: '子应用 1',
+        icon: '📱',
+        description: '基于 React 构建的独立子应用',
+        url: 'http://localhost:8001',
+        tech: 'React 18 + React Router 6 + Vite'
+      },
+      {
+        id: 'sub-app2',
+        name: '子应用 2',
+        icon: '📊',
+        description: 'Dashboard 数据可视化应用',
+        url: 'http://localhost:8002',
+        tech: 'React 18 + React Router 6 + Vite'
+      }
+    ]
+    
+    dashboard.setAttribute('apps', JSON.stringify(apps))
+    
+    // 监听事件
+    dashboard.addEventListener('app-click', (e) => {
+      console.log('App clicked:', e.detail)
+    })
+    
+    dashboard.addEventListener('app-close', () => {
+      console.log('App closed')
+    })
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,138 @@
+.dashboard {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.dashboard h2 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-card,
+.info-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.chart-card h3,
+.info-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.bar-chart {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 200px;
+  padding-top: 20px;
+}
+
+.bar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.bar-container {
+  height: 160px;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.bar {
+  width: 70%;
+  max-width: 40px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.4) 100%);
+  border-radius: 6px 6px 0 0;
+  position: relative;
+  transition: height 0.3s ease;
+}
+
+.bar-value {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.bar-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 8px;
+}
+
+.status-list {
+  list-style: none;
+}
+
+.status-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.status-list li:last-child {
+  border-bottom: none;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.status-dot.online {
+  background: #2ed573;
+  box-shadow: 0 0 8px rgba(46, 213, 115, 0.5);
+}
+
+.status-dot.warning {
+  background: #ffa502;
+  box-shadow: 0 0 8px rgba(255, 165, 2, 0.5);
+}
+
+.status-list li span:nth-child(2) {
+  flex: 1;
+  font-size: 14px;
+}
+
+.status-tag {
+  font-size: 12px;
+  padding: 4px 10px;
+  background: rgba(46, 213, 115, 0.2);
+  color: #2ed573;
+  border-radius: 12px;
+}
+
+.status-tag.warning {
+  background: rgba(255, 165, 2, 0.2);
+  color: #ffa502;
+}
+
