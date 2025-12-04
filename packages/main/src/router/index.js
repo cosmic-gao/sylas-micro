@@ -18,6 +18,11 @@ const routes = [
     component: Home
   },
   {
+    path: '/app/:appId/*',
+    name: 'AppDashboardWildcard',
+    component: Home
+  },
+  {
     path: '/sub-app1',
     name: 'SubApp1',
     component: SubApp1

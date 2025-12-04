@@ -103,6 +103,8 @@ class AppDashboard extends HTMLElement {
     this.wujie = null
     this.appContainer = null
     this.urlCleanInterval = null
+    this.destroyFn = null // 保存销毁函数
+    this.routeSyncInterval = null // 路由同步定时器
   }
 
   static get observedAttributes() {
@@ -145,13 +147,15 @@ class AppDashboard extends HTMLElement {
     // 等待渲染完成后再检查
     setTimeout(() => {
       const path = window.location.pathname
-      const appMatch = path.match(/^\/app\/([^\/]+)/)
+      const appMatch = path.match(/^\/app\/([^\/]+)(.*)$/)
       if (appMatch) {
         const appId = appMatch[1]
+        const subPath = appMatch[2] || '/' // 提取子路由路径
         const app = this.apps.find(a => a.id === appId)
         if (app) {
-          console.log('Auto-loading app from URL path:', appId)
-          this.loadSubApp(app, false) // false 表示不更新 URL（因为已经在正确的 URL 上）
+          console.log('Auto-loading app from URL path:', appId, 'with sub-path:', subPath)
+          // 传递子路由路径
+          this.loadSubApp(app, false, subPath) // false 表示不更新 URL（因为已经在正确的 URL 上）
         }
       }
     }, 100)
@@ -165,9 +169,6 @@ class AppDashboard extends HTMLElement {
   }
 
   handlePopState(event) {
-    // 清理 URL 参数
-    this.cleanUrlParams()
-    
     // 当浏览器返回时，检查是否需要关闭或加载子应用
     const path = window.location.pathname
     const appMatch = path.match(/^\/app\/([^\/]+)/)
@@ -176,14 +177,51 @@ class AppDashboard extends HTMLElement {
     if (this.currentApp && !isAppPage) {
       // 如果当前有应用打开，但 URL 不再是应用页面，则关闭应用
       console.log('Browser back button clicked, closing app')
-      this.closeApp(false) // false 表示不更新 URL（因为已经在正确的 URL 上）
+      // 使用 setTimeout 延迟关闭，确保 Wujie 内部状态准备好
+      setTimeout(() => {
+        this.closeApp(false) // false 表示不更新 URL（因为已经在正确的 URL 上）
+      }, 0)
     } else if (isAppPage) {
-      // 如果 URL 是应用页面，但当前没有应用打开，则加载应用
+      // 如果 URL 是应用页面，需要加载或更新应用
       const appId = appMatch[1]
       const app = this.apps.find(a => a.id === appId)
-      if (app && this.currentApp !== appId) {
-        console.log('Browser forward/back to app page, loading app:', appId)
-        this.loadSubApp(app, false) // false 表示不更新 URL（因为已经在正确的 URL 上）
+      
+      if (app) {
+        // 提取子路由路径
+        const subPath = path.replace(`/app/${appId}`, '') || '/'
+        if (this.currentApp !== appId) {
+          // 切换到不同的应用
+          console.log('Browser forward/back to app page, loading app:', appId, 'with sub-path:', subPath)
+          this.loadSubApp(app, false, subPath) // false 表示不更新 URL（因为已经在正确的 URL 上）
+        } else {
+          // 同一应用内的路由变化，需要更新子应用的 URL
+          console.log('Same app, updating sub-path:', subPath)
+          // 如果应用已经加载，需要更新 URL
+          if (this.wujie && typeof this.wujie.startApp === 'function') {
+            const appUrl = `${app.url}${subPath === '/' ? '' : subPath}`
+            // 重新加载应用以更新路由
+            this.wujie.startApp({
+              name: app.id,
+              url: appUrl,
+              el: this.appContainer,
+              sync: false,
+              alive: true,
+              fetch: window.fetch,
+              prefix: `/app/${app.id}`
+            }).catch(e => console.warn('Failed to update app route:', e))
+          }
+          
+          // 确保应用容器是显示的
+          const appContainerElement = this.shadowRoot.getElementById('app-container')
+          const dashboardView = this.shadowRoot.getElementById('dashboard-view')
+          
+          if (appContainerElement && appContainerElement.style.display === 'none') {
+            appContainerElement.style.display = 'block'
+          }
+          if (dashboardView && !dashboardView.classList.contains('hide')) {
+            dashboardView.classList.add('hide')
+          }
+        }
       }
     }
   }
@@ -278,7 +316,7 @@ class AppDashboard extends HTMLElement {
     await this.loadSubApp(app)
   }
 
-  async loadSubApp(app, updateUrl = true) {
+  async loadSubApp(app, updateUrl = true, subPath = null) {
     console.log('loadSubApp called with:', app)
     
     if (!this.wujie) {
@@ -295,25 +333,17 @@ class AppDashboard extends HTMLElement {
       return
     }
 
-    // 销毁之前的应用
-    if (this.currentApp) {
-      try {
-        // 如果有保存的销毁函数，使用它
-        if (this.destroyFn && typeof this.destroyFn === 'function') {
-          this.destroyFn()
-          this.destroyFn = null
-        } else if (typeof this.wujie.destroyApp === 'function') {
-          this.wujie.destroyApp(this.currentApp)
-        } else if (typeof this.wujie.destroy === 'function') {
-          this.wujie.destroy(this.currentApp)
-        }
-      } catch (e) {
-        console.warn('Failed to destroy previous app:', e)
-      }
+    // 由于 alive: true，应用会保持存活，切换时不需要销毁
+    // 只需要保存新的应用 ID，之前的应用会继续在后台运行
+    // 这样可以避免触发 Wujie 的清理逻辑，防止 '$clear' 错误
+    if (this.currentApp && this.currentApp !== app.id) {
+      console.log('Switching from app:', this.currentApp, 'to:', app.id)
+      // 不清空 destroyFn，因为应用还在运行
+      // 不调用销毁方法，因为 alive: true 时应用应该保持存活
     }
 
-    // 清空容器内容
-    this.appContainer.innerHTML = ''
+    // 不清空容器内容，因为 alive: true 时应用需要保持状态
+    // Wujie 会自动处理应用在容器中的显示
 
     // 显示应用容器，隐藏卡片列表
     const appContainerElement = this.shadowRoot.getElementById('app-container')
@@ -330,10 +360,15 @@ class AppDashboard extends HTMLElement {
     this.currentApp = app.id
 
     // 添加浏览器历史记录，支持返回按钮（使用真实路径）
+    // 注意：如果启用了 sync: true，Wujie 会自动更新 URL，这里不需要手动更新
+    // 但如果当前 URL 不是应用路径，则需要初始化
     if (updateUrl !== false) {
-      const state = { appId: app.id, appName: app.name }
-      const url = `/app/${app.id}`
-      window.history.pushState(state, app.name, url)
+      const currentPath = window.location.pathname
+      if (!currentPath.startsWith(`/app/${app.id}`)) {
+        const state = { appId: app.id, appName: app.name }
+        const url = `/app/${app.id}`
+        window.history.pushState(state, app.name, url)
+      }
     }
 
     // 更新标题
@@ -351,48 +386,149 @@ class AppDashboard extends HTMLElement {
       // 检查 wujie API - wujie 原生 API 使用 startApp
       if (typeof this.wujie.startApp === 'function') {
         console.log('Using wujie.startApp method')
+        const appPrefix = `/app/${app.id}`
+        // 如果提供了子路由路径，将其添加到 URL 中
+        const appUrl = subPath ? `${app.url}${subPath === '/' ? '' : subPath}` : app.url
+        console.log('Loading app with URL:', appUrl, 'subPath:', subPath)
         const destroyFn = await this.wujie.startApp({
           name: app.id,
-          url: app.url,
+          url: appUrl,
           el: this.appContainer,
-          sync: false, // 禁用路由同步，避免在 URL 上添加查询参数
-          alive: true,
-          fetch: window.fetch
+          sync: false, // 禁用自动同步（避免查询参数），手动处理路由同步
+          alive: true, // 保持应用存活，提升切换性能
+          fetch: window.fetch,
+          prefix: appPrefix // 配置路由前缀
         })
         console.log('App loaded successfully, destroy function:', destroyFn)
         // 保存销毁函数
         this.destroyFn = destroyFn
       } else if (typeof this.wujie.start === 'function') {
         console.log('Using wujie.start method')
+        const appPrefix = `/app/${app.id}`
+        // 如果提供了子路由路径，将其添加到 URL 中
+        const appUrl = subPath ? `${app.url}${subPath === '/' ? '' : subPath}` : app.url
+        console.log('Loading app with URL:', appUrl, 'subPath:', subPath)
         await this.wujie.start({
           name: app.id,
-          url: app.url,
+          url: appUrl,
           el: this.appContainer,
-          sync: false, // 禁用路由同步，避免在 URL 上添加查询参数
-          alive: true,
-          fetch: window.fetch
+          sync: false, // 禁用自动同步（避免查询参数），手动处理路由同步
+          alive: true, // 保持应用存活，提升切换性能
+          fetch: window.fetch,
+          prefix: appPrefix // 配置路由前缀
         })
         console.log('App loaded successfully')
       } else {
         throw new Error(`Wujie API not found. Available methods: ${Object.keys(this.wujie).join(', ')}`)
       }
       
-      // 清理 URL 中的查询参数（如果 Wujie 已经添加了）
-      // 延迟清理，确保 Wujie 的路由同步完成
-      setTimeout(() => {
-        this.cleanUrlParams()
-      }, 100)
-      
-      // 定期清理 URL 参数（防止 Wujie 持续添加）
-      if (this.urlCleanInterval) {
-        clearInterval(this.urlCleanInterval)
-      }
-      this.urlCleanInterval = setInterval(() => {
-        this.cleanUrlParams()
-      }, 500)
+      // 监听子应用路由变化，手动同步到主应用 URL（避免查询参数）
+      this.setupRouteSync(app.id)
     } catch (error) {
       console.error('Failed to load sub app:', error)
       this.showError(`无法加载子应用: ${app.name}`, error.message, app.url)
+    }
+  }
+
+  setupRouteSync(appId) {
+    // 手动监听子应用的路由变化，同步到主应用 URL 路径中
+    // 避免使用查询参数，避免 URL 闪烁
+    try {
+      // 停止之前的监听器
+      if (this.routeSyncInterval) {
+        clearInterval(this.routeSyncInterval)
+      }
+      
+      const app = this.apps.find(a => a.id === appId)
+      if (!app) return
+      
+      let lastPath = window.location.pathname
+      
+      // 定期检查 iframe 内的路由变化
+      this.routeSyncInterval = setInterval(() => {
+        if (this.currentApp !== appId) {
+          // 如果不是当前应用，停止监听
+          if (this.routeSyncInterval) {
+            clearInterval(this.routeSyncInterval)
+            this.routeSyncInterval = null
+          }
+          return
+        }
+        
+        try {
+          // 查找对应的 iframe
+          const iframes = document.querySelectorAll('iframe')
+          let subAppPath = null
+          
+          for (const iframe of iframes) {
+            try {
+              // 检查 iframe 是否属于当前应用
+              const iframeName = iframe.name || iframe.id || ''
+              if (iframeName.includes(appId) || iframe.src.includes(app.url)) {
+                // 尝试获取 iframe 内的路径
+                const iframeWindow = iframe.contentWindow
+                if (iframeWindow && iframeWindow.location) {
+                  const iframePath = iframeWindow.location.pathname
+                  if (iframePath) {
+                    subAppPath = iframePath
+                    break
+                  }
+                }
+              }
+            } catch (e) {
+              // 跨域限制，无法访问 iframe 内容
+              // 使用其他方法
+            }
+          }
+          
+          // 如果找到了子应用路径，更新主应用 URL
+          if (subAppPath !== null) {
+            const newPath = `/app/${appId}${subAppPath === '/' ? '' : subAppPath}`
+            const currentPath = window.location.pathname
+            
+            // 只有当路径不同时才更新，避免频繁更新导致闪烁
+            if (currentPath !== newPath) {
+              lastPath = newPath
+              window.history.replaceState(
+                { appId, appName: app.name },
+                '',
+                newPath
+              )
+            }
+          }
+        } catch (e) {
+          // 忽略错误，继续监听
+        }
+      }, 300) // 300ms 检查一次，避免过于频繁
+    } catch (e) {
+      console.warn('Failed to setup route sync:', e)
+    }
+  }
+
+  checkAppExists(appId) {
+    // 检查应用是否在 Wujie 中存在
+    try {
+      // 检查 Wujie 的内部应用列表
+      if (this.wujie && typeof this.wujie.getApps === 'function') {
+        const apps = this.wujie.getApps()
+        return apps && apps.includes(appId)
+      }
+      
+      // 如果 getApps 不存在，尝试其他方式检查
+      // 检查是否有对应的 iframe
+      const iframes = document.querySelectorAll('iframe')
+      for (const iframe of iframes) {
+        if (iframe.name === appId || iframe.id === appId) {
+          return true
+        }
+      }
+      
+      // 默认返回 true，让 Wujie 自己处理
+      return true
+    } catch (e) {
+      console.warn('Error checking app existence:', e)
+      // 出错时返回 false，避免尝试销毁不存在的应用
+      return false
     }
   }
 
@@ -448,14 +584,17 @@ class AppDashboard extends HTMLElement {
   }
 
   closeApp(updateUrl = true) {
-    // 停止 URL 清理定时器
+    // 停止 URL 清理定时器（如果存在）
     if (this.urlCleanInterval) {
       clearInterval(this.urlCleanInterval)
       this.urlCleanInterval = null
     }
     
-    // 清理 URL 参数
-    this.cleanUrlParams()
+    // 停止路由同步定时器
+    if (this.routeSyncInterval) {
+      clearInterval(this.routeSyncInterval)
+      this.routeSyncInterval = null
+    }
     
     // 隐藏应用容器，显示卡片列表
     const appContainerElement = this.shadowRoot.getElementById('app-container')
@@ -469,28 +608,16 @@ class AppDashboard extends HTMLElement {
       dashboardView.classList.remove('hide')
     }
     
-    // 清空容器内容
-    if (this.appContainer) {
-      this.appContainer.innerHTML = ''
-    }
-    
-    // 销毁应用
-    if (this.currentApp && this.wujie) {
-      try {
-        // 优先使用保存的销毁函数
-        if (this.destroyFn && typeof this.destroyFn === 'function') {
-          this.destroyFn()
-          this.destroyFn = null
-        } else if (typeof this.wujie.destroyApp === 'function') {
-          this.wujie.destroyApp(this.currentApp)
-        } else if (typeof this.wujie.destroy === 'function') {
-          this.wujie.destroy(this.currentApp)
-        }
-      } catch (e) {
-        console.warn('Failed to destroy app:', e)
-      }
-    }
+    // 保存应用 ID，因为后面会清空 currentApp
+    const appIdToDestroy = this.currentApp
     this.currentApp = null
+    
+    // 由于 alive: true，应用会保持存活，所以不需要销毁
+    // 只需要清空销毁函数引用
+    this.destroyFn = null
+    
+    // 注意：不清空容器内容，因为 alive: true 需要保持应用状态
+    // 如果清空会导致应用重新加载
     
     // 更新浏览器历史记录（如果当前在子应用页面）
     if (updateUrl) {
